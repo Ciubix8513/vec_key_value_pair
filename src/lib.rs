@@ -7,7 +7,82 @@ where
     K: PartialEq,
     K: Eq,
 {
-    vec: Vec<(K, V)>,
+    pub(self) vec: Vec<(K, V)>,
+}
+pub struct VaccantEntrty<'a, K: std::cmp::Eq, V> {
+    key: K,
+    table: &'a mut VecMap<K, V>,
+}
+impl<'a, K, V> VaccantEntrty<'a, K, V>
+where
+    K: std::cmp::Eq,
+{
+    pub fn key(&self) -> &K {
+        &self.key
+    }
+
+    pub fn into_key(self) -> K {
+        self.key
+    }
+
+    pub fn insert(self, value: V) -> &'a mut V {
+        _ = self.table.insert(self.key, value).unwrap();
+        //When we insert a new value it is always last in the vec so this SHOULD be fine
+        &mut self.table.vec.last_mut().unwrap().1
+    }
+}
+impl<K: std::fmt::Debug + std::cmp::Eq, V> std::fmt::Debug for VaccantEntrty<'_, K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("VacantEntry").field(self.key()).finish()
+    }
+}
+
+//Sigh, can use RustcOccupied entry, gotta make shit up myself
+pub struct OccupiedEntrty<'a, K: std::cmp::Eq, V> {
+    ///Index of the entry, only useful in here
+    index: usize,
+    key: &'a K,
+    value: &'a mut V,
+    table: &'a mut VecMap<K, V>,
+}
+
+impl<'a, K, V> OccupiedEntrty<'a, K, V>
+where
+    K: std::cmp::Eq,
+{
+    pub fn get(&self) -> &V {
+        &self.value
+    }
+
+    pub fn get_mut(&mut self) -> &mut V {
+        self.value
+    }
+
+    pub fn insert(&mut self, value: V) -> V {
+        let old = self.table.vec.remove(self.index);
+        self.table.vec.push((old.0, value));
+        old.1
+    }
+
+    pub fn into_mut(self) -> &'a mut V {
+        self.value
+    }
+
+    pub fn key(&self) -> &K {
+        &self.key
+    }
+    pub fn remove(self) -> V {
+        self.table.remove(&self.key).unwrap()
+    }
+
+    pub fn remove_entry(self) -> (K, V) {
+        self.table.vec.remove(self.index)
+    }
+}
+
+pub enum Entry<'a, K: std::cmp::Eq, V> {
+    Occupied(OccupiedEntrty<'a, K, V>),
+    Vaccant(VaccantEntrty<'a, K, V>),
 }
 
 pub struct IntoIter<K, V> {
@@ -82,16 +157,21 @@ where
     }
 
     pub fn remove(&mut self, k: &K) -> Option<V> {
-        let old_value = self.get(k);
-        if old_value.is_some() {
-            self.vec.retain_mut(|v| &v.0 != k)
+        let mut ind = None;
+        for (index, i) in self.vec.iter().enumerate() {
+            if i.0 == *k {
+                ind = Some(index);
+            }
         }
-        old_value.map(|i| *i)
+        if let Some(ind) = ind {
+            return Some(self.vec.remove(ind).1);
+        }
+        None
     }
 
     pub fn get(&self, k: &K) -> Option<&V> {
-        for (key, v) in self.vec {
-            if &key == k {
+        for (key, v) in self.vec.iter() {
+            if key == k {
                 return Some(&v);
             }
         }
@@ -99,17 +179,17 @@ where
     }
 
     pub fn get_mut(&mut self, k: &K) -> Option<&mut V> {
-        for (key, mut v) in self.vec {
-            if &key == k {
-                return Some(&mut v);
+        for (key, v) in self.vec.iter_mut() {
+            if key == k {
+                return Some(v);
             }
         }
         None
     }
 
     pub fn contains_key(&self, k: &K) -> bool {
-        for (key, _) in self.vec {
-            if &key == k {
+        for (key, _) in self.vec.iter() {
+            if key == k {
                 return true;
             }
         }
