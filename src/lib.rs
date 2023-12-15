@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 mod tests;
 
 ///A drop in replacement for `std::collections::HashMap`
@@ -80,9 +82,67 @@ where
     }
 }
 
-pub enum Entry<'a, K: std::cmp::Eq, V> {
+pub enum Entry<'a, K, V>
+where
+    K: std::cmp::Eq,
+{
     Occupied(OccupiedEntrty<'a, K, V>),
     Vaccant(VaccantEntrty<'a, K, V>),
+}
+
+impl<'a, K, V> Entry<'a, K, V>
+where
+    K: std::cmp::Eq,
+{
+    pub fn or_insert(self, default: V) -> &'a mut V {
+        match self {
+            Entry::Occupied(e) => e.value,
+            Entry::Vaccant(e) => e.insert(default),
+        }
+    }
+
+    pub fn or_insert_with<F: FnOnce() -> V>(self, default: F) -> &'a mut V {
+        match self {
+            Entry::Occupied(e) => e.value,
+            Entry::Vaccant(e) => e.insert(default()),
+        }
+    }
+    pub fn or_insert_with_key<F: FnOnce(&K) -> V>(self, default: F) -> &'a mut V {
+        match self {
+            Entry::Occupied(e) => e.value,
+            Entry::Vaccant(e) => {
+                let value = default(&e.key);
+                e.insert(value)
+            }
+        }
+    }
+    pub fn key(&self) -> &K {
+        match self {
+            Entry::Occupied(e) => e.key(),
+            Entry::Vaccant(e) => e.key(),
+        }
+    }
+    pub fn and_modify<F>(self, f: F) -> Self
+    where
+        F: FnOnce(&mut V),
+    {
+        match self {
+            Entry::Occupied(e) => {
+                f(e.value);
+                Entry::Occupied(e)
+            }
+            Entry::Vaccant(_) => self,
+        }
+    }
+}
+impl<'a, K, V> Entry<'a, K, V>
+where
+    K: std::cmp::Eq,
+    V: Default,
+{
+    pub fn or_default(self) -> &'a mut V {
+        self.or_insert(V::default())
+    }
 }
 
 pub struct IntoIter<K, V> {
