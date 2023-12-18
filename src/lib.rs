@@ -9,11 +9,11 @@ where
     K: PartialEq,
     K: Eq,
 {
-    pub(self) vec: Vec<(K, V)>,
+    vec: Vec<(K, V)>,
 }
 pub struct VaccantEntrty<'a, K: std::cmp::Eq, V> {
     key: K,
-    table: &'a mut VecMap<K, V>,
+    table: &'a mut Vec<(K, V)>,
 }
 impl<'a, K, V> VaccantEntrty<'a, K, V>
 where
@@ -28,9 +28,10 @@ where
     }
 
     pub fn insert(self, value: V) -> &'a mut V {
-        _ = self.table.insert(self.key, value).unwrap();
+        let key = self.key;
+        self.table.push((key, value));
         //When we insert a new value it is always last in the vec so this SHOULD be fine
-        &mut self.table.vec.last_mut().unwrap().1
+        &mut self.table.last_mut().unwrap().1
     }
 }
 impl<K: std::fmt::Debug + std::cmp::Eq, V> std::fmt::Debug for VaccantEntrty<'_, K, V> {
@@ -43,9 +44,8 @@ impl<K: std::fmt::Debug + std::cmp::Eq, V> std::fmt::Debug for VaccantEntrty<'_,
 pub struct OccupiedEntrty<'a, K: std::cmp::Eq, V> {
     ///Index of the entry, only useful in here
     index: usize,
-    key: &'a K,
-    value: &'a mut V,
-    table: &'a mut VecMap<K, V>,
+    // key: &'a K,
+    table: &'a mut Vec<(K, V)>,
 }
 
 impl<'a, K, V> OccupiedEntrty<'a, K, V>
@@ -53,32 +53,32 @@ where
     K: std::cmp::Eq,
 {
     pub fn get(&self) -> &V {
-        &self.value
+        &self.table.get(self.index).unwrap().1
     }
 
     pub fn get_mut(&mut self) -> &mut V {
-        self.value
+        &mut self.table.get_mut(self.index).unwrap().1
     }
 
     pub fn insert(&mut self, value: V) -> V {
-        let old = self.table.vec.remove(self.index);
-        self.table.vec.push((old.0, value));
+        let old = self.table.remove(self.index);
+        self.table.push((old.0, value));
         old.1
     }
 
     pub fn into_mut(self) -> &'a mut V {
-        self.value
+        &mut self.table.get_mut(self.index).unwrap().1
     }
 
     pub fn key(&self) -> &K {
-        &self.key
+        &self.table.get(self.index).unwrap().0
     }
     pub fn remove(self) -> V {
-        self.table.remove(&self.key).unwrap()
+        self.table.swap_remove(self.index).1
     }
 
     pub fn remove_entry(self) -> (K, V) {
-        self.table.vec.remove(self.index)
+        self.table.remove(self.index)
     }
 }
 
@@ -87,7 +87,7 @@ where
     K: std::cmp::Eq,
 {
     Occupied(OccupiedEntrty<'a, K, V>),
-    Vaccant(VaccantEntrty<'a, K, V>),
+    Vacant(VaccantEntrty<'a, K, V>),
 }
 
 impl<'a, K, V> Entry<'a, K, V>
@@ -96,21 +96,21 @@ where
 {
     pub fn or_insert(self, default: V) -> &'a mut V {
         match self {
-            Entry::Occupied(e) => e.value,
-            Entry::Vaccant(e) => e.insert(default),
+            Entry::Occupied(e) => e.into_mut(),
+            Entry::Vacant(e) => e.insert(default),
         }
     }
 
     pub fn or_insert_with<F: FnOnce() -> V>(self, default: F) -> &'a mut V {
         match self {
-            Entry::Occupied(e) => e.value,
-            Entry::Vaccant(e) => e.insert(default()),
+            Entry::Occupied(e) => e.into_mut(),
+            Entry::Vacant(e) => e.insert(default()),
         }
     }
     pub fn or_insert_with_key<F: FnOnce(&K) -> V>(self, default: F) -> &'a mut V {
         match self {
-            Entry::Occupied(e) => e.value,
-            Entry::Vaccant(e) => {
+            Entry::Occupied(e) => e.into_mut(),
+            Entry::Vacant(e) => {
                 let value = default(&e.key);
                 e.insert(value)
             }
@@ -119,7 +119,7 @@ where
     pub fn key(&self) -> &K {
         match self {
             Entry::Occupied(e) => e.key(),
-            Entry::Vaccant(e) => e.key(),
+            Entry::Vacant(e) => e.key(),
         }
     }
     pub fn and_modify<F>(self, f: F) -> Self
@@ -127,11 +127,12 @@ where
         F: FnOnce(&mut V),
     {
         match self {
-            Entry::Occupied(e) => {
-                f(e.value);
+            Entry::Occupied(mut e) => {
+                let borrow = e.get_mut();
+                f(borrow);
                 Entry::Occupied(e)
             }
-            Entry::Vaccant(_) => self,
+            Entry::Vacant(_) => self,
         }
     }
 }
@@ -260,8 +261,26 @@ where
         self.vec.shrink_to_fit()
     }
 
-    pub fn entry(&mut self, key: &K) -> Entry<'_, K, V> {
-        todo!()
+    pub fn entry<'a>(&'a mut self, key: K) -> Entry<'a, K, V> {
+        match {
+            let mut val = None;
+            for (index, (map_key, v)) in self.vec.iter().enumerate() {
+                if &key == map_key {
+                    val = Some(index);
+                    break;
+                }
+            }
+            val
+        } {
+            Some(e) => Entry::Occupied(OccupiedEntrty {
+                index: e,
+                table: &mut self.vec,
+            }),
+            None => Entry::Vacant(VaccantEntrty {
+                key,
+                table: &mut self.vec,
+            }),
+        }
     }
 
     //An iterator over all the keys of the map in order they were added, has time complexity of O(len)
