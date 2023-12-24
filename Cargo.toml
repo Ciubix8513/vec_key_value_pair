@@ -2,3 +2,6 @@
 name = "vec_key_value_pair"
 version = "0.1.0"
 edition = "2021"
+
+[features]
+raw-entry = []

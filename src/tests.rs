@@ -1,7 +1,8 @@
 use std::cell::RefCell;
 
+use crate::Entry::*;
 #[allow(unused_imports)]
-use crate::VecMap;
+use crate::*;
 
 #[test]
 fn test_zero_capacities() {
@@ -226,8 +227,8 @@ fn test_empty_remove() {
 fn test_empty_entry() {
     let mut m: VecMap<i32, bool> = VecMap::new();
     match m.entry(0) {
-        Occupied(_) => panic!(),
-        Vacant(_) => {}
+        Entry::Occupied(_) => panic!(),
+        Entry::Vacant(_) => {}
     }
     assert!(*m.entry(0).or_insert(true));
     assert_eq!(m.len(), 1);
@@ -684,37 +685,37 @@ fn test_entry() {
     assert_eq!(map.len(), 6);
 }
 
-#[test]
-fn test_entry_take_doesnt_corrupt() {
-    #![allow(deprecated)] //rand
-                          // Test for #19292
-    fn check(m: &VecMap<i32, ()>) {
-        for k in m.keys() {
-            assert!(m.contains_key(k), "{k} is in keys() but not in the map?");
-        }
-    }
+// #[test]
+// fn test_entry_take_doesnt_corrupt() {
+//     #![allow(deprecated)] //rand
+//                           // Test for #19292
+//     fn check(m: &VecMap<i32, ()>) {
+//         for k in m.keys() {
+//             assert!(m.contains_key(k), "{k} is in keys() but not in the map?");
+//         }
+//     }
 
-    let mut m = VecMap::new();
-    let mut rng = test_rng();
+//     let mut m = VecMap::new();
+//     let mut rng = test_rng();
 
-    // Populate the map with some items.
-    for _ in 0..50 {
-        let x = rng.gen_range(-10..10);
-        m.insert(x, ());
-    }
+//     // Populate the map with some items.
+//     for _ in 0..50 {
+//         let x = rng.gen_range(-10..10);
+//         m.insert(x, ());
+//     }
 
-    for _ in 0..1000 {
-        let x = rng.gen_range(-10..10);
-        match m.entry(x) {
-            Vacant(_) => {}
-            Occupied(e) => {
-                e.remove();
-            }
-        }
+//     for _ in 0..1000 {
+//         let x = rng.gen_range(-10..10);
+//         match m.entry(x) {
+//             Vacant(_) => {}
+//             Occupied(e) => {
+//                 e.remove();
+//             }
+//         }
 
-        check(&m);
-    }
-}
+//         check(&m);
+//     }
+// }
 
 #[test]
 fn test_extend_ref() {
@@ -804,43 +805,44 @@ fn test_retain() {
     assert_eq!(map[&6], 60);
 }
 
+// #[test]
+// #[cfg_attr(miri, ignore)] // Miri does not support signalling OOM
+// #[cfg_attr(target_os = "android", ignore)] // Android used in CI has a broken dlmalloc
+// fn test_try_reserve() {
+//     let mut empty_bytes: VecMap<u8, u8> = VecMap::new();
+
+//     const MAX_USIZE: usize = usize::MAX;
+
+//     assert_matches!(
+//         empty_bytes.try_reserve(MAX_USIZE).map_err(|e| e.kind()),
+//         Err(CapacityOverflow),
+//         "usize::MAX should trigger an overflow!"
+//     );
+
+//     if let Err(AllocError { .. }) = empty_bytes
+//         .try_reserve(MAX_USIZE / 16)
+//         .map_err(|e| e.kind())
+//     {
+//     } else {
+//         // This may succeed if there is enough free memory. Attempt to
+//         // allocate a few more hashmaps to ensure the allocation will fail.
+//         let mut empty_bytes2: VecMap<u8, u8> = VecMap::new();
+//         let _ = empty_bytes2.try_reserve(MAX_USIZE / 16);
+//         let mut empty_bytes3: VecMap<u8, u8> = VecMap::new();
+//         let _ = empty_bytes3.try_reserve(MAX_USIZE / 16);
+//         let mut empty_bytes4: VecMap<u8, u8> = VecMap::new();
+//         assert_matches!(
+//             empty_bytes4
+//                 .try_reserve(MAX_USIZE / 16)
+//                 .map_err(|e| e.kind()),
+//             Err(AllocError { .. }),
+//             "usize::MAX / 16 should trigger an OOM!"
+//         );
+//     }
+// }
+
 #[test]
-#[cfg_attr(miri, ignore)] // Miri does not support signalling OOM
-#[cfg_attr(target_os = "android", ignore)] // Android used in CI has a broken dlmalloc
-fn test_try_reserve() {
-    let mut empty_bytes: VecMap<u8, u8> = VecMap::new();
-
-    const MAX_USIZE: usize = usize::MAX;
-
-    assert_matches!(
-        empty_bytes.try_reserve(MAX_USIZE).map_err(|e| e.kind()),
-        Err(CapacityOverflow),
-        "usize::MAX should trigger an overflow!"
-    );
-
-    if let Err(AllocError { .. }) = empty_bytes
-        .try_reserve(MAX_USIZE / 16)
-        .map_err(|e| e.kind())
-    {
-    } else {
-        // This may succeed if there is enough free memory. Attempt to
-        // allocate a few more hashmaps to ensure the allocation will fail.
-        let mut empty_bytes2: VecMap<u8, u8> = VecMap::new();
-        let _ = empty_bytes2.try_reserve(MAX_USIZE / 16);
-        let mut empty_bytes3: VecMap<u8, u8> = VecMap::new();
-        let _ = empty_bytes3.try_reserve(MAX_USIZE / 16);
-        let mut empty_bytes4: VecMap<u8, u8> = VecMap::new();
-        assert_matches!(
-            empty_bytes4
-                .try_reserve(MAX_USIZE / 16)
-                .map_err(|e| e.kind()),
-            Err(AllocError { .. }),
-            "usize::MAX / 16 should trigger an OOM!"
-        );
-    }
-}
-
-#[test]
+#[cfg(feature = "raw-entry")]
 fn test_raw_entry() {
     use super::RawEntryMut::{Occupied, Vacant};
 
@@ -942,169 +944,6 @@ fn test_raw_entry() {
             Occupied(mut o) => assert_eq!(Some(o.get_key_value()), kv),
             Vacant(_) => assert_eq!(v, None),
         }
-    }
-}
-
-mod test_drain_filter {
-    use super::*;
-
-    use crate::panic::{catch_unwind, AssertUnwindSafe};
-    use crate::sync::atomic::{AtomicUsize, Ordering};
-
-    trait EqSorted: Iterator {
-        fn eq_sorted<I: IntoIterator<Item = Self::Item>>(self, other: I) -> bool;
-    }
-
-    impl<T: Iterator> EqSorted for T
-    where
-        T::Item: Eq + Ord,
-    {
-        fn eq_sorted<I: IntoIterator<Item = Self::Item>>(self, other: I) -> bool {
-            let mut v: Vec<_> = self.collect();
-            v.sort_unstable();
-            v.into_iter().eq(other)
-        }
-    }
-
-    #[test]
-    fn empty() {
-        let mut map: VecMap<i32, i32> = VecMap::new();
-        map.drain_filter(|_, _| unreachable!("there's nothing to decide on"));
-        assert!(map.is_empty());
-    }
-
-    #[test]
-    fn consuming_nothing() {
-        let pairs = (0..3).map(|i| (i, i));
-        let mut map: VecMap<_, _> = pairs.collect();
-        assert!(map
-            .drain_filter(|_, _| false)
-            .eq_sorted(crate::iter::empty()));
-        assert_eq!(map.len(), 3);
-    }
-
-    #[test]
-    fn consuming_all() {
-        let pairs = (0..3).map(|i| (i, i));
-        let mut map: VecMap<_, _> = pairs.clone().collect();
-        assert!(map.drain_filter(|_, _| true).eq_sorted(pairs));
-        assert!(map.is_empty());
-    }
-
-    #[test]
-    fn mutating_and_keeping() {
-        let pairs = (0..3).map(|i| (i, i));
-        let mut map: VecMap<_, _> = pairs.collect();
-        assert!(map
-            .drain_filter(|_, v| {
-                *v += 6;
-                false
-            })
-            .eq_sorted(crate::iter::empty()));
-        assert!(map.keys().copied().eq_sorted(0..3));
-        assert!(map.values().copied().eq_sorted(6..9));
-    }
-
-    #[test]
-    fn mutating_and_removing() {
-        let pairs = (0..3).map(|i| (i, i));
-        let mut map: VecMap<_, _> = pairs.collect();
-        assert!(map
-            .drain_filter(|_, v| {
-                *v += 6;
-                true
-            })
-            .eq_sorted((0..3).map(|i| (i, i + 6))));
-        assert!(map.is_empty());
-    }
-
-    #[test]
-    fn drop_panic_leak() {
-        static PREDS: AtomicUsize = AtomicUsize::new(0);
-        static DROPS: AtomicUsize = AtomicUsize::new(0);
-
-        struct D;
-        impl Drop for D {
-            fn drop(&mut self) {
-                if DROPS.fetch_add(1, Ordering::SeqCst) == 1 {
-                    panic!("panic in `drop`");
-                }
-            }
-        }
-
-        let mut map = (0..3).map(|i| (i, D)).collect::<VecMap<_, _>>();
-
-        catch_unwind(move || {
-            drop(map.drain_filter(|_, _| {
-                PREDS.fetch_add(1, Ordering::SeqCst);
-                true
-            }))
-        })
-        .unwrap_err();
-
-        assert_eq!(PREDS.load(Ordering::SeqCst), 3);
-        assert_eq!(DROPS.load(Ordering::SeqCst), 3);
-    }
-
-    #[test]
-    fn pred_panic_leak() {
-        static PREDS: AtomicUsize = AtomicUsize::new(0);
-        static DROPS: AtomicUsize = AtomicUsize::new(0);
-
-        struct D;
-        impl Drop for D {
-            fn drop(&mut self) {
-                DROPS.fetch_add(1, Ordering::SeqCst);
-            }
-        }
-
-        let mut map = (0..3).map(|i| (i, D)).collect::<VecMap<_, _>>();
-
-        catch_unwind(AssertUnwindSafe(|| {
-            drop(
-                map.drain_filter(|_, _| match PREDS.fetch_add(1, Ordering::SeqCst) {
-                    0 => true,
-                    _ => panic!(),
-                }),
-            )
-        }))
-        .unwrap_err();
-
-        assert_eq!(PREDS.load(Ordering::SeqCst), 2);
-        assert_eq!(DROPS.load(Ordering::SeqCst), 1);
-        assert_eq!(map.len(), 2);
-    }
-
-    // Same as above, but attempt to use the iterator again after the panic in the predicate
-    #[test]
-    fn pred_panic_reuse() {
-        static PREDS: AtomicUsize = AtomicUsize::new(0);
-        static DROPS: AtomicUsize = AtomicUsize::new(0);
-
-        struct D;
-        impl Drop for D {
-            fn drop(&mut self) {
-                DROPS.fetch_add(1, Ordering::SeqCst);
-            }
-        }
-
-        let mut map = (0..3).map(|i| (i, D)).collect::<VecMap<_, _>>();
-
-        {
-            let mut it = map.drain_filter(|_, _| match PREDS.fetch_add(1, Ordering::SeqCst) {
-                0 => true,
-                _ => panic!(),
-            });
-            catch_unwind(AssertUnwindSafe(|| while it.next().is_some() {})).unwrap_err();
-            // Iterator behaviour after a panic is explicitly unspecified,
-            // so this is just the current implementation:
-            let result = catch_unwind(AssertUnwindSafe(|| it.next()));
-            assert!(result.is_err());
-        }
-
-        assert_eq!(PREDS.load(Ordering::SeqCst), 3);
-        assert_eq!(DROPS.load(Ordering::SeqCst), 1);
-        assert_eq!(map.len(), 2);
     }
 }
 

@@ -152,7 +152,6 @@ pub struct IntoIter<K, V> {
 
 impl<K, V> Iterator for IntoIter<K, V>
 where
-    K: PartialEq,
     K: Eq,
 {
     type Item = (K, V);
@@ -161,6 +160,16 @@ where
         self.iter.next()
     }
 }
+
+impl<K, V> ExactSizeIterator for IntoIter<K, V>
+where
+    K: Eq,
+{
+    fn len(&self) -> usize {
+        self.iter.len()
+    }
+}
+
 impl<K, V> IntoIterator for VecMap<K, V>
 where
     K: PartialEq,
@@ -193,6 +202,12 @@ impl<'a, K, V> Iterator for Keys<'a, K, V> {
     }
 }
 
+impl<K, V> ExactSizeIterator for Keys<'_, K, V> {
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct IntoKeys<K, V> {
     inner: std::vec::IntoIter<(K, V)>,
@@ -202,6 +217,12 @@ impl<K, V> Iterator for IntoKeys<K, V> {
     type Item = K;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next().map(|i| i.0)
+    }
+}
+
+impl<K, V> ExactSizeIterator for IntoKeys<K, V> {
+    fn len(&self) -> usize {
+        self.inner.len()
     }
 }
 
@@ -221,19 +242,31 @@ impl<'a, K, V> Iterator for Values<'a, K, V> {
     }
 }
 
+impl<K, V> ExactSizeIterator for Values<'_, K, V> {
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+}
+
 #[derive(Debug)]
 pub struct ValuesMut<'a, K, V> {
     inner: core::slice::IterMut<'a, (K, V)>,
 }
 
 impl<'a, K, V> Iterator for ValuesMut<'a, K, V> {
-    type Item = &'a V;
+    type Item = &'a mut V;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.inner.next() {
             Some((_, v)) => Some(v),
             None => None,
         }
+    }
+}
+
+impl<K, V> ExactSizeIterator for ValuesMut<'_, K, V> {
+    fn len(&self) -> usize {
+        self.inner.len()
     }
 }
 
@@ -249,9 +282,21 @@ impl<K, V> Iterator for IntoValues<K, V> {
     }
 }
 
+impl<K, V> ExactSizeIterator for IntoValues<K, V> {
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Iter<'a, K, V> {
     inner: core::slice::Iter<'a, (K, V)>,
+}
+
+impl<'a, K, V> ExactSizeIterator for Iter<'a, K, V> {
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
 }
 
 impl<'a, K, V> Iterator for Iter<'a, K, V> {
@@ -281,6 +326,12 @@ impl<'a, K, V> Iterator for IterMut<'a, K, V> {
     }
 }
 
+impl<K, V> ExactSizeIterator for IterMut<'_, K, V> {
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+}
+
 #[derive(Debug)]
 pub struct Drain<'a, K, V> {
     inner: std::vec::Drain<'a, (K, V)>,
@@ -291,6 +342,12 @@ impl<K, V> Iterator for Drain<'_, K, V> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
+    }
+}
+
+impl<K, V> ExactSizeIterator for Drain<'_, K, V> {
+    fn len(&self) -> usize {
+        self.inner.len()
     }
 }
 
