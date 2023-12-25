@@ -7,9 +7,22 @@ use std::{
 mod tests;
 
 ///A drop in replacement for `std::collections::HashMap`
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Eq)]
 pub struct VecMap<K, V> {
     vec: Vec<(K, V)>,
+}
+
+impl<K: PartialEq + Eq, V: PartialEq> PartialEq for VecMap<K, V> {
+    fn eq(&self, other: &Self) -> bool {
+        self.iter()
+            .map(|i| {
+                other
+                    .get(i.0)
+                    .and_then(|j| Some(j == i.1))
+                    .unwrap_or_default()
+            })
+            .fold(true, |a, i| i && a)
+    }
 }
 pub struct VaccantEntrty<'a, K: std::cmp::Eq, V> {
     key: K,
@@ -308,6 +321,10 @@ impl<'a, K, V> Iterator for Iter<'a, K, V> {
             None => None,
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
+    }
 }
 
 #[derive(Debug)]
@@ -323,6 +340,10 @@ impl<'a, K, V> Iterator for IterMut<'a, K, V> {
             Some((k, v)) => Some((k, v)),
             None => None,
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.inner.size_hint()
     }
 }
 

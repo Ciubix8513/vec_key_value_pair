@@ -1,7 +1,7 @@
+#![allow(unused_imports)]
 use std::cell::RefCell;
 
 use crate::Entry::*;
-#[allow(unused_imports)]
 use crate::*;
 
 #[test]
