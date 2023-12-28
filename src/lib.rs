@@ -1,15 +1,20 @@
-use std::{
-    borrow::{Borrow, BorrowMut},
-    collections::HashMap,
-    ops::Index,
-};
+use std::{borrow::Borrow, collections::HashMap, ops::Index};
 
 mod tests;
 
 ///A drop in replacement for `std::collections::HashMap`
-#[derive(Debug, Default, Clone, Eq)]
+#[derive(Default, Clone, Eq)]
 pub struct VecMap<K, V> {
     vec: Vec<(K, V)>,
+}
+
+impl<K: std::fmt::Debug, V: std::fmt::Debug> std::fmt::Debug for VecMap<K, V> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // f.debug_struct("VecMap").field("vec", &self.vec).finish()
+        f.debug_map()
+            .entries(self.vec.iter().map(|&(ref k, ref v)| (k, v)))
+            .finish()
+    }
 }
 
 impl<K: PartialEq + Eq, V: PartialEq> PartialEq for VecMap<K, V> {
@@ -464,7 +469,7 @@ where
         Q: Eq + ?Sized,
     {
         let mut ind = None;
-        for (index, (key, v)) in self.vec.iter().enumerate() {
+        for (index, (key, _)) in self.vec.iter().enumerate() {
             if k == key.borrow() {
                 ind = Some(index);
             }
