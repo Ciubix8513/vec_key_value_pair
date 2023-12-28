@@ -74,12 +74,12 @@ struct Droppable {
 }
 
 impl Droppable {
-    fn new(k: usize) -> Droppable {
+    fn new(k: usize) -> Self {
         DROP_VECTOR.with(|slot| {
             slot.borrow_mut()[k] += 1;
         });
 
-        Droppable { k }
+        Self { k }
     }
 }
 
@@ -92,8 +92,8 @@ impl Drop for Droppable {
 }
 
 impl Clone for Droppable {
-    fn clone(&self) -> Droppable {
-        Droppable::new(self.k)
+    fn clone(&self) -> Self {
+        Self::new(self.k)
     }
 }
 

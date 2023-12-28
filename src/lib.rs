@@ -1,3 +1,9 @@
+#![allow(
+    clippy::must_use_candidate,
+    clippy::missing_panics_doc,
+    clippy::unwrap_or_default
+)]
+
 use std::{borrow::Borrow, collections::HashMap, ops::Index};
 
 mod tests;
@@ -12,7 +18,7 @@ impl<K: std::fmt::Debug, V: std::fmt::Debug> std::fmt::Debug for VecMap<K, V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // f.debug_struct("VecMap").field("vec", &self.vec).finish()
         f.debug_map()
-            .entries(self.vec.iter().map(|&(ref k, ref v)| (k, v)))
+            .entries(self.vec.iter().map(|(k, v)| (k, v)))
             .finish()
     }
 }
@@ -20,12 +26,7 @@ impl<K: std::fmt::Debug, V: std::fmt::Debug> std::fmt::Debug for VecMap<K, V> {
 impl<K: PartialEq + Eq, V: PartialEq> PartialEq for VecMap<K, V> {
     fn eq(&self, other: &Self) -> bool {
         self.iter()
-            .map(|i| {
-                other
-                    .get(i.0)
-                    .and_then(|j| Some(j == i.1))
-                    .unwrap_or_default()
-            })
+            .map(|i| other.get(i.0).map(|j| j == i.1).unwrap_or_default())
             .fold(true, |a, i| i && a)
     }
 }
@@ -37,7 +38,7 @@ impl<'a, K, V> VaccantEntrty<'a, K, V>
 where
     K: std::cmp::Eq,
 {
-    pub fn key(&self) -> &K {
+    pub const fn key(&self) -> &K {
         &self.key
     }
 
@@ -140,6 +141,7 @@ where
             Entry::Vacant(e) => e.key(),
         }
     }
+    #[must_use]
     pub fn and_modify<F>(self, f: F) -> Self
     where
         F: FnOnce(&mut V),
@@ -190,7 +192,6 @@ where
 
 impl<K, V> IntoIterator for VecMap<K, V>
 where
-    K: PartialEq,
     K: Eq,
 {
     type Item = (K, V);
@@ -321,10 +322,7 @@ impl<'a, K, V> Iterator for Iter<'a, K, V> {
     type Item = (&'a K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.inner.next() {
-            Some((k, v)) => Some((k, v)),
-            None => None,
-        }
+        self.inner.next().map(|(k, v)| (k, v))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -341,10 +339,7 @@ impl<'a, K, V> Iterator for IterMut<'a, K, V> {
     type Item = (&'a K, &'a mut V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.inner.next() {
-            Some((k, v)) => Some((k, v)),
-            None => None,
-        }
+        self.inner.next().map(|(k, v)| (&(*k), v))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -382,7 +377,7 @@ where
     K: Eq,
 {
     ///Creates an empty `VecMap`
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self { vec: Vec::new() }
     }
 
@@ -399,7 +394,7 @@ where
     }
 
     pub fn reserve(&mut self, additional: usize) {
-        self.vec.reserve(additional)
+        self.vec.reserve(additional);
     }
 
     pub fn len(&self) -> usize {
@@ -410,10 +405,7 @@ where
         let old = self.remove(&k);
         self.vec.push((k, v));
 
-        match old {
-            Some(old) => Some(old),
-            None => None,
-        }
+        old
     }
 
     pub fn remove<Q>(&mut self, k: &Q) -> Option<V>
@@ -455,9 +447,9 @@ where
         K: Borrow<Q>,
         Q: Eq + ?Sized,
     {
-        for (key, v) in self.vec.iter() {
+        for (key, v) in &self.vec {
             if k == key.borrow() {
-                return Some(&v);
+                return Some(v);
             }
         }
         None
@@ -482,7 +474,7 @@ where
         K: Borrow<Q> + PartialEq<Q>,
         Q: Eq + ?Sized,
     {
-        for (key, _) in self.vec.iter() {
+        for (key, _) in &self.vec {
             if key == k {
                 return true;
             }
@@ -498,7 +490,7 @@ where
         self.vec.shrink_to(min_capacity);
     }
 
-    pub fn entry<'a>(&'a mut self, key: K) -> Entry<'a, K, V> {
+    pub fn entry(&mut self, key: K) -> Entry<'_, K, V> {
         match {
             let mut val = None;
             for (index, (map_key, _)) in self.vec.iter().enumerate() {
@@ -524,7 +516,7 @@ where
         K: Borrow<Q> + PartialEq<Q>,
         Q: Eq + ?Sized,
     {
-        for i in self.vec.iter() {
+        for i in &self.vec {
             if &i.0 == k {
                 return Some((&i.0, &i.1));
             }
