@@ -2,6 +2,6 @@
 name = "vec_key_value_pair"
 version = "0.1.0"
 edition = "2021"
-
-[features]
-raw-entry = []
+repository = "https://github.com/Ciubix8513/vec_key_value_pair"
+license ="Apache"
+description = "A drop-in replacement for std::HashMap that uses Vec on the backend"
