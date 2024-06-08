@@ -1,8 +1,8 @@
 #![allow(unused_imports)]
 use std::cell::RefCell;
 
-use crate::Entry::*;
-use crate::*;
+use crate::map::Entry::*;
+use crate::map::*;
 
 #[test]
 fn test_zero_capacities() {
